@@ -131,19 +131,24 @@ def converter(gas_flow: float,
     for bed in range(bed_count):
         results['bed_temps_in'].append(current_T)
 
-        Xeq = equilibrium_conversion(current_T)
+        # --- iterative bed reaction (adiabatic bed behaviour)
+    T_guess = current_T
 
-        # Approach-to-equilibrium model (real converter behaviour)
-        approach = 0.75 * activity          # 75% approach per bed
-        remaining_possible = Xeq - (1 - so2/so2_in)
+    for _ in range(6):   # small convergence loop
+        Xeq = equilibrium_conversion(T_guess)
+        approach = 0.75 * activity
+        remaining_possible = max(Xeq - (1 - so2/so2_in), 0)
 
-        X_bed = max(min(approach * remaining_possible, 1.0), 0.0)
-
+        X_bed = approach * remaining_possible
 
         reacted = so2 * X_bed
-        Q = reacted  * DELTAH_SO2_SO3
+        Q = reacted * DELTAH_SO2_SO3
         dT = Q / (gas_flow * CP_GAS)
-        T_out = current_T + dT
+
+        T_guess = current_T + dT
+
+        T_out = T_guess
+
         results['bed_temps_out'].append(T_out)
 
         so2 = so2 * (1 - X_bed)
