@@ -157,7 +157,9 @@ def converter(gas_flow: float,
             reacted = so2 * X_bed
 
             Q = reacted * DELTAH_SO2_SO3
-            dT = Q / (gas_flow * CP_GAS)
+            thermal_effectiveness = 3.8   # catalyst bed amplification factor
+            dT = thermal_effectiveness * Q / (gas_flow * CP_GAS)
+
 
             # thermal damping (physical catalyst effectiveness)
             dT = min(max(dT, 0), 110)
