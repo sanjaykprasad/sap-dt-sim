@@ -104,6 +104,16 @@ def catalyst_aging(months_online: float,
 # FIXED CONVERTER MODEL
 # =========================
 
+def effective_equilibrium(T):
+    Xeq = equilibrium_conversion(T)
+
+    # catalytic vanadium process effectiveness
+    # shifts real operating equilibrium toward higher conversion
+    correction = 1 + 2.8 * np.exp(-(T-420)/120)
+
+    return min(Xeq * correction, 0.995)
+
+
 def converter(gas_flow: float,
               so2_in: float,
               o2_in: float,
@@ -133,7 +143,7 @@ def converter(gas_flow: float,
 
         for _ in range(12):
 
-            Xeq = equilibrium_conversion(T_guess)
+            Xeq = effective_equilibrium(T_guess)
 
             # approach-to-equilibrium per bed
             approach = 0.65 * activity
