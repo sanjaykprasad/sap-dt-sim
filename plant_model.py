@@ -260,7 +260,11 @@ def diagnose_process(sulphur: float, air_ratio: float, inlet_temp: float,
     confidence = "Medium"
 
     # Pattern 1: Late bed hotter than early beds → catalyst ageing
-    if bed_temps[3] > bed_temps[1]:
+    # Correct: reaction shifting downstream
+    delta1 = bed_temps[0] - inlet_temp
+    delta4 = bed_temps[3] - (bed_temps[2] - 120)
+
+    if delta4 > delta1:
         diagnosis.append("Catalyst deactivation shifting reaction downstream")
         confidence = "High"
 

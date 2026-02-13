@@ -154,9 +154,7 @@ try:
         so2_slip_ppm=stack_ppm
     )
 
-    # Also generate a simplified temperature profile for what-if (we'll keep both)
-    bed_temps_simple = reactor_temperature_profile(sulphur, air_ratio, inlet_temp, catalyst_activity)
-
+    
 except Exception as e:
     st.error(f"Model error: {str(e)}")
     st.stop()
@@ -252,8 +250,12 @@ if "last_actions" in st.session_state and st.session_state.last_actions:
         )
 
         # Predict new temperature profile and conversion
-        new_beds = reactor_temperature_profile(new_s, new_a, new_t, new_act)
-        new_conv = calculate_conversion(new_s, new_a, new_t, new_act)
+        gas_flow2, so2_2, o2_2, _ = burner(new_s, new_a)
+        conv2 = converter(gas_flow2, so2_2, o2_2, new_t, new_act)
+
+        new_beds = conv2['bed_temps_out']
+        new_conv = conv2['overall_conversion'] * 100.0
+
 
         st.markdown("### 📈 Predicted Outcome")
         st.write(f"**Conversion:** {new_conv:.1f}% (current: {conversion_total:.1f}%)")
