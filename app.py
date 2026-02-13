@@ -33,28 +33,28 @@ st.set_page_config(
 SCENARIOS = {
     "Normal Operation": {
         "sulphur": 100,
-        "air_ratio": 1.10,
+        "air_ratio": 11.0,
         "inlet_temp": 420,
         "catalyst_activity": 1.0,
         "fault": "None"
     },
     "Scenario 1 — Conversion drop overnight": {
         "sulphur": 100,
-        "air_ratio": 1.10,
+        "air_ratio": 11.0,
         "inlet_temp": 470,  # too hot
         "catalyst_activity": 1.0,
         "fault": "Equilibrium limitation"
     },
     "Scenario 2 — Gradual performance loss": {
         "sulphur": 100,
-        "air_ratio": 1.10,
+        "air_ratio": 11.0,
         "inlet_temp": 420,
         "catalyst_activity": 0.65,  # degraded catalyst
         "fault": "Catalyst ageing"
     },
     "Scenario 3 — Steam spike": {
         "sulphur": 135,  # feed increased
-        "air_ratio": 1.10,
+        "air_ratio": 11.0,
         "inlet_temp": 420,
         "catalyst_activity": 1.0,
         "fault": "Throughput increase"
@@ -86,9 +86,10 @@ with st.sidebar:
 
     air_ratio = st.slider(
         "Air Ratio (kg air / kg sulphur)",
-        min_value=1.0, max_value=1.3, value=scenario["air_ratio"], step=0.01,
-        help="Mass ratio of combustion air to sulphur feed"
+        min_value=8.0, max_value=14.0, value=11.0, step=0.1,
     )
+
+    
 
     inlet_temp = st.slider(
         "Converter Inlet Temperature (°C)",
