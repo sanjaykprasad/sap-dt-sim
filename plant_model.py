@@ -71,8 +71,8 @@ def burner(sulphur_tpd: float, air_ratio: float) -> Tuple[float, float, float, f
     o2_req = m_s * 1.0  # Simplified: 1 kg O2 per kg S
     excess_o2 = max(o2_in - o2_req, 0)
 
-    so2 = m_s / gas_flow
-    o2 = excess_o2 / gas_flow
+    so2 = m_s 
+    o2 = excess_o2 
 
     Q = m_s * DELTAH_S_BURN
     dT = Q / (gas_flow * CP_GAS)
@@ -141,7 +141,7 @@ def converter(gas_flow: float,
             o2_required = o2
 
         reacted = so2 * X_bed
-        Q = reacted * gas_flow * DELTAH_SO2_SO3
+        Q = reacted  * DELTAH_SO2_SO3
         dT = Q / (gas_flow * CP_GAS)
         T_out = current_T + dT
         results['bed_temps_out'].append(T_out)

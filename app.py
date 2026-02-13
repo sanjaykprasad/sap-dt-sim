@@ -144,7 +144,7 @@ try:
     bed_conversions = conv_results['bed_conversions']
     cum_conv = conv_results['cumulative_conversion']
     conversion_total = conv_results['overall_conversion'] * 100.0   # percent
-    stack_ppm = so2_out * 1e6
+    stack_ppm = (so2_out/gas_flow) * 1e6
 
     steam = steam_generation(gas_flow, conv_results['final_temp']) / 1000.0  # t/h
 
