@@ -132,13 +132,13 @@ def converter(gas_flow: float,
         results['bed_temps_in'].append(current_T)
 
         Xeq = equilibrium_conversion(current_T)
-        X_bed = min(activity * Xeq, 1.0)
 
-        o2_required = so2 * X_bed * 0.5 * (MW_O2 / MW_SO2)
-        if o2_required > o2:
-            X_bed = o2 / (so2 * 0.5 * (MW_O2 / MW_SO2))
-            X_bed = min(X_bed, 1.0)
-            o2_required = o2
+        # Approach-to-equilibrium model (real converter behaviour)
+        approach = 0.75 * activity          # 75% approach per bed
+        remaining_possible = Xeq - (1 - so2/so2_in)
+
+        X_bed = max(min(approach * remaining_possible, 1.0), 0.0)
+
 
         reacted = so2 * X_bed
         Q = reacted  * DELTAH_SO2_SO3
