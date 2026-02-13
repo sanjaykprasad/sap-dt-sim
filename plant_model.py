@@ -100,70 +100,83 @@ def catalyst_aging(months_online: float,
         months_online = 0
     return initial_activity * np.exp(-decay_rate * months_online)
 
+# =========================
+# FIXED CONVERTER MODEL
+# =========================
 
-def converter(gas_flow: float, 
-              so2_in: float, 
-              o2_in: float, 
-              T_in: float, 
-              activity: float, 
-              bed_count: int = 4) -> Dict[str, Union[float, List[float]]]:
-    """
-    Multi-bed catalytic converter with interpass cooling.
-    
-    Returns a dictionary containing bed temperatures, conversions, and outlet conditions.
-    """
+def converter(gas_flow: float,
+              so2_in: float,
+              o2_in: float,
+              T_in: float,
+              activity: float,
+              bed_count: int = 4):
+
     so2 = so2_in
-    o2 = o2_in
     current_T = T_in
 
     results = {
         'bed_temps_in': [],
         'bed_temps_out': [],
-        'bed_conversions': [],      # % per bed
-        'cumulative_conversion': [], # % cumulative
+        'bed_conversions': [],
+        'cumulative_conversion': [],
         'so2_out': so2_in,
         'o2_out': o2_in,
         'overall_conversion': 0.0
     }
 
-    cum_conversion = 0.0
-
     for bed in range(bed_count):
+
         results['bed_temps_in'].append(current_T)
 
-        # --- iterative bed reaction (adiabatic bed behaviour)
-    T_guess = current_T
+        # --- Adiabatic bed solver ---
+        T_guess = current_T
 
-    for _ in range(6):   # small convergence loop
-        Xeq = equilibrium_conversion(T_guess)
-        approach = 0.75 * activity
-        remaining_possible = max(Xeq - (1 - so2/so2_in), 0)
+        for _ in range(12):
 
-        X_bed = approach * remaining_possible
+            Xeq = equilibrium_conversion(T_guess)
 
-        reacted = so2 * X_bed
-        Q = reacted * DELTAH_SO2_SO3
-        dT = Q / (gas_flow * CP_GAS)
+            # approach-to-equilibrium per bed
+            approach = 0.65 * activity
 
-        T_guess = current_T + dT
+            X_target = Xeq
+            X_current = 1 - so2/so2_in
+            dX = max(X_target - X_current, 0)
+
+            X_bed = approach * dX
+
+            reacted = so2 * X_bed
+
+            Q = reacted * DELTAH_SO2_SO3
+            dT = Q / (gas_flow * CP_GAS)
+
+            # thermal damping (physical catalyst effectiveness)
+            dT = min(max(dT, 0), 110)
+
+            T_new = current_T + dT
+
+            if abs(T_new - T_guess) < 0.2:
+                break
+
+            T_guess = T_new
 
         T_out = T_guess
 
-        results['bed_temps_out'].append(T_out)
-
+        # mass balance
         so2 = so2 * (1 - X_bed)
 
-        cum_conversion = 1 - so2/so2_in
-        results['bed_conversions'].append(X_bed * 100)
-        results['cumulative_conversion'].append(cum_conversion * 100)
+        cumulative = 1 - so2/so2_in
 
+        results['bed_temps_out'].append(T_out)
+        results['bed_conversions'].append(X_bed * 100)
+        results['cumulative_conversion'].append(cumulative * 100)
+
+        # interpass cooling
         if bed < bed_count - 1:
-            current_T = T_out - 120
+            current_T = max(T_out - 120, 380)
 
     results['so2_out'] = so2
-    results['o2_out'] = o2
+    results['overall_conversion'] = cumulative
     results['final_temp'] = T_out
-    results['overall_conversion'] = cum_conversion
 
     return results
 
