@@ -113,7 +113,6 @@ def effective_equilibrium(T):
 
     return min(Xeq * correction, 0.995)
 
-
 def converter(gas_flow: float,
               so2_in: float,
               o2_in: float,
@@ -123,6 +122,8 @@ def converter(gas_flow: float,
 
     so2 = so2_in
     current_T = T_in
+
+    thermal_effectiveness = 3.8   # packed bed heat amplification
 
     results = {
         'bed_temps_in': [],
@@ -136,32 +137,27 @@ def converter(gas_flow: float,
 
     for bed in range(bed_count):
 
+        # --- inlet to this bed ---
+        so2_bed_in = so2
         results['bed_temps_in'].append(current_T)
 
-        # --- Adiabatic bed solver ---
+        # ---- adiabatic bed solve ----
         T_guess = current_T
 
         for _ in range(12):
 
             Xeq = effective_equilibrium(T_guess)
-
-            # approach-to-equilibrium per bed
             approach = 0.65 * activity
 
-            X_target = Xeq
-            X_current = 1 - so2/so2_in
-            dX = max(X_target - X_current, 0)
+            # conversion relative to THIS bed
+            X_bed = approach * Xeq
 
-            X_bed = approach * dX
-
-            reacted = so2 * X_bed
+            reacted = so2_bed_in * X_bed
 
             Q = reacted * DELTAH_SO2_SO3
-            thermal_effectiveness = 3.8   # catalyst bed amplification factor
             dT = thermal_effectiveness * Q / (gas_flow * CP_GAS)
 
-
-            # thermal damping (physical catalyst effectiveness)
+            # physical damping
             dT = min(max(dT, 0), 110)
 
             T_new = current_T + dT
@@ -173,8 +169,8 @@ def converter(gas_flow: float,
 
         T_out = T_guess
 
-        # mass balance
-        so2 = so2 * (1 - X_bed)
+        # ---- update stream ----
+        so2 = so2_bed_in * (1 - X_bed)
 
         cumulative = 1 - so2/so2_in
 
