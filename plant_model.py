@@ -147,7 +147,6 @@ def converter(gas_flow: float,
         results['bed_temps_out'].append(T_out)
 
         so2 = so2 * (1 - X_bed)
-        o2 = max(o2 - o2_required, 0)
 
         cum_conversion = 1 - so2/so2_in
         results['bed_conversions'].append(X_bed * 100)
