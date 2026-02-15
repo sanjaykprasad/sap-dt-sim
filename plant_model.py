@@ -1,4 +1,5 @@
 """
+plant_model.py
 Sulphuric Acid Plant - First Principles Model
 ============================================
 This module implements a reduced-order physics-based model of a sulphuric acid plant,
@@ -19,7 +20,7 @@ from typing import Dict, List, Tuple, Optional, Union
 
 # --- Physical Constants ---
 CP_GAS = 1.1          # Specific heat of process gas [kJ/kg-K]
-DELTAH_SO2_SO3 = 990  # Heat released when SO2 oxidizes to SO3 [kJ/kg SO2]
+DELTAH_SO2_SO3 = 1520  # Heat released when SO2 oxidizes to SO3 [kJ/kg SO2]
 DELTAH_S_BURN = 9300  # Heat released when sulphur burns [kJ/kg sulphur]
 LATENT_STEAM = 2100   # Latent heat of vaporization for steam [kJ/kg steam]
 AIR_O2 = 0.21         # Mass fraction of oxygen in air
@@ -71,8 +72,8 @@ def burner(sulphur_tpd: float, air_ratio: float) -> Tuple[float, float, float, f
     o2_req = m_s * 1.0  # Simplified: 1 kg O2 per kg S
     excess_o2 = max(o2_in - o2_req, 0)
 
-    so2 = m_s 
-    o2 = excess_o2 
+    so2 = m_s / gas_flow
+    o2 = excess_o2 /gas_flow
 
     Q = m_s * DELTAH_S_BURN
     dT = Q / (gas_flow * CP_GAS)
@@ -88,8 +89,9 @@ def burner(sulphur_tpd: float, air_ratio: float) -> Tuple[float, float, float, f
 def equilibrium_conversion(T: float) -> float:
     """Equilibrium conversion of SO2 to SO3 at temperature T (°C)."""
     T_k = T + 273.15
-    Kp = np.exp(11.305 - 11300 / T_k)
+    Kp = np.exp(11.305 + 11300 / T_k)   # correct sign: + not -
     return 1 / (1 + 1/Kp**0.5)
+
 
 
 def catalyst_aging(months_online: float, 
@@ -105,25 +107,31 @@ def catalyst_aging(months_online: float,
 # =========================
 
 def effective_equilibrium(T):
+    """
+    Industrial converter equilibrium approximation
+    (accounts for excess O2 and SO3 removal)
+    """
+
+    # base thermodynamic equilibrium
     Xeq = equilibrium_conversion(T)
 
-    # catalytic vanadium process effectiveness
-    # shifts real operating equilibrium toward higher conversion
-    correction = 1 + 2.8 * np.exp(-(T-420)/120)
+    # industrial shift (strong at lower temp)
+    shift = 1 / (1 + np.exp(-(430 - T)/25))
 
-    return min(Xeq * correction, 0.995)
+    # pushes equilibrium higher at lower T
+    Xeff = Xeq + (0.98 - Xeq) * shift
+
+    return min(max(Xeff, 0), 0.995)
 
 def converter(gas_flow: float,
               so2_in: float,
               o2_in: float,
               T_in: float,
               activity: float,
-              bed_count: int = 4):
-
+              bed_count: int = 4) -> Dict[str, Union[float, List[float]]]:
     so2 = so2_in
+    o2 = o2_in
     current_T = T_in
-
-    thermal_effectiveness = 3.8   # packed bed heat amplification
 
     results = {
         'bed_temps_in': [],
@@ -135,59 +143,46 @@ def converter(gas_flow: float,
         'overall_conversion': 0.0
     }
 
-    for bed in range(bed_count):
+    cum_conversion = 0.0
 
-        # --- inlet to this bed ---
-        so2_bed_in = so2
+    for bed in range(bed_count):
         results['bed_temps_in'].append(current_T)
 
-        # ---- adiabatic bed solve ----
-        T_guess = current_T
+        Xeq = equilibrium_conversion(current_T)
+        # Maximum approach to equilibrium for a well‑designed bed (e.g., 85%)
+        max_approach = 0.85  
+        X_bed = min(activity * Xeq * max_approach, 0.997)   # absolute cap 99.7%
+       
+        o2_required = so2 * X_bed * 0.5 * (MW_O2 / MW_SO2)
+        if o2_required > o2:
+            X_bed = o2 / (so2 * 0.5 * (MW_O2 / MW_SO2))
+            X_bed = min(X_bed, 1.0)
+            o2_required = o2
 
-        for _ in range(12):
-
-            Xeq = effective_equilibrium(T_guess)
-            approach = 0.65 * activity
-
-            # conversion relative to THIS bed
-            X_bed = approach * Xeq
-
-            reacted = so2_bed_in * X_bed
-
-            Q = reacted * DELTAH_SO2_SO3
-            dT = thermal_effectiveness * Q / (gas_flow * CP_GAS)
-
-            # physical damping
-            dT = min(max(dT, 0), 110)
-
-            T_new = current_T + dT
-
-            if abs(T_new - T_guess) < 0.2:
-                break
-
-            T_guess = T_new
-
-        T_out = T_guess
-
-        # ---- update stream ----
-        so2 = so2_bed_in * (1 - X_bed)
-
-        cumulative = 1 - so2/so2_in
-
+        reacted = so2 * X_bed
+        Q = reacted * gas_flow * DELTAH_SO2_SO3
+        dT = Q / (gas_flow * CP_GAS)
+        T_out = current_T + dT
         results['bed_temps_out'].append(T_out)
-        results['bed_conversions'].append(X_bed * 100)
-        results['cumulative_conversion'].append(cumulative * 100)
 
-        # interpass cooling
+        so2 = so2 * (1 - X_bed)
+        o2 = max(o2 - o2_required, 0)
+
+        cum_conversion = 1 - so2/so2_in
+        results['bed_conversions'].append(X_bed * 100)
+        results['cumulative_conversion'].append(cum_conversion * 100)
+
         if bed < bed_count - 1:
-            current_T = max(T_out - 120, 380)
+            # Target inlet to next bed ~420°C
+            target_next_inlet = 420
+            current_T = target_next_inlet
 
     results['so2_out'] = so2
-    results['overall_conversion'] = cumulative
+    results['o2_out'] = o2
     results['final_temp'] = T_out
+    results['overall_conversion'] = cum_conversion
 
     return results
-
 
 # ============================================================================
 # SIMPLIFIED TEMPERATURE PROFILE GENERATOR (for fast what-if)

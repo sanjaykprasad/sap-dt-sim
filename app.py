@@ -1,4 +1,5 @@
 """
+app.py
 Sulphuric Acid Plant Digital Twin - User Interface
 ==================================================
 Streamlit application for operator training and decision support.
@@ -86,7 +87,7 @@ with st.sidebar:
 
     air_ratio = st.slider(
         "Air Ratio (kg air / kg sulphur)",
-        min_value=8.0, max_value=14.0, value=11.0, step=0.1,
+        min_value=8.0, max_value=14.0, value=scenario["air_ratio"], step=0.1,
     )
 
     
@@ -140,11 +141,15 @@ try:
     conv_results = converter(gas_flow, so2, o2, inlet_temp, catalyst_activity)
 
     so2_out = conv_results['so2_out']
+    # Enforce a minimum realistic SO₂ slip (e.g., 50 ppm by mass)
+    min_slip_fraction = 50e-6   # 50 ppm
+    so2_out = max(so2_out, min_slip_fraction)
+    
     temps = conv_results['bed_temps_out']
     bed_conversions = conv_results['bed_conversions']
     cum_conv = conv_results['cumulative_conversion']
     conversion_total = conv_results['overall_conversion'] * 100.0   # percent
-    stack_ppm = (so2_out/gas_flow) * 1e6
+    stack_ppm = so2_out * 1e6
 
     steam = steam_generation(gas_flow, conv_results['final_temp']) / 1000.0  # t/h
 
